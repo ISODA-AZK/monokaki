@@ -187,6 +187,16 @@ input:focus,textarea:focus{outline:2px solid var(--ai);outline-offset:-1px}
 .menu-item.danger{color:var(--shu)}
 .menu-item:last-child{border-bottom:none}
 .note{font-size:12px;color:var(--ink-soft);margin-top:10px;line-height:1.7}
+.picker-list{max-height:48vh;overflow-y:auto;border:1px solid var(--line);border-radius:8px}
+.picker-row{display:flex;align-items:center;gap:10px;padding:11px 12px;
+  border-bottom:1px solid var(--line);cursor:pointer}
+.picker-row:last-child{border-bottom:none}
+.picker-row input{width:18px;height:18px;flex-shrink:0;accent-color:var(--ai)}
+.picker-row .num{font-family:var(--serif);color:var(--ai);font-size:13px;
+  min-width:22px;text-align:center;flex-shrink:0}
+.picker-row .ttl{flex:1;font-size:14px;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.picker-row .cnt{font-size:11px;color:var(--ink-soft);flex-shrink:0}
 
 .fab{
   position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom) + 72px);z-index:9;
@@ -776,7 +786,8 @@ function openWorkMenu(){
   openModal(`
     <h2>作品の操作</h2>
     <button class="menu-item" onclick="renameWork()">タイトルを変更</button>
-    <button class="menu-item" onclick="exportTxt()">本文をTXTで書き出す</button>
+    <button class="menu-item" onclick="exportTxt()">本文をTXTで書き出す（全話）</button>
+    <button class="menu-item" onclick="openExportPicker()">話数を選んでTXT書き出し</button>
     <button class="menu-item danger" onclick="deleteWork()">この作品を削除</button>
     <div class="row"><button class="iconbtn" onclick="closeModal()">閉じる</button></div>
   `);
@@ -794,10 +805,56 @@ function deleteWork(){
   data.works = data.works.filter(x=>x.id!==w.id);
   removeWorkRecord(w.id); closeModal(); go({screen:"home"});
 }
+function buildTxt(w, chapters){
+  return `${w.title}\n\n` + chapters.map(c=>`【${c.title}】\n\n${c.body}`).join("\n\n\n");
+}
 function exportTxt(){
   const w = getWork();
-  const txt = `${w.title}\n\n` + w.chapters.map(c=>`【${c.title}】\n\n${c.body}`).join("\n\n\n");
-  download(`${w.title}.txt`, txt, "text/plain");
+  download(`${w.title}.txt`, buildTxt(w, w.chapters), "text/plain");
+  closeModal();
+}
+/* ---- 話数を選んで書き出し ---- */
+function openExportPicker(){
+  const w = getWork();
+  if(!w.chapters.length){ alert("書き出せる話がおへん。"); return; }
+  const rows = w.chapters.map((c,i)=>`
+    <label class="picker-row">
+      <input type="checkbox" class="exp-chk" value="${c.id}" checked>
+      <span class="num">${i+1}</span>
+      <span class="ttl">${mask(c.title, 16) || "無題"}</span>
+      <span class="cnt">${countChars(c.body).toLocaleString()}字</span>
+    </label>`).join("");
+  openModal(`
+    <h2>話数を選んで書き出し</h2>
+    <div class="row" style="margin-top:0;margin-bottom:10px">
+      <button class="iconbtn" onclick="expSelectAll(true)">全部選ぶ</button>
+      <button class="iconbtn" onclick="expSelectAll(false)">全部外す</button>
+    </div>
+    <div class="picker-list">${rows}</div>
+    <div class="row">
+      <button class="iconbtn" onclick="closeModal()">やめとく</button>
+      <button class="iconbtn primary" onclick="doExportSelected()">選んだ話を書き出す</button>
+    </div>
+  `);
+}
+function expSelectAll(v){
+  document.querySelectorAll(".exp-chk").forEach(c=>c.checked=v);
+}
+function doExportSelected(){
+  const w = getWork();
+  const ids = Array.from(document.querySelectorAll(".exp-chk"))
+    .filter(c=>c.checked).map(c=>c.value);
+  if(!ids.length){ alert("一話も選ばれてしまへん。"); return; }
+  const chapters = w.chapters.filter(c=>ids.includes(c.id));
+  // ファイル名：1話だけならその話名、複数なら作品名＋話数
+  let name;
+  if(chapters.length === 1){
+    name = `${w.title}_${chapters[0].title}.txt`;
+  } else {
+    const nums = chapters.map(c=>w.chapters.indexOf(c)+1);
+    name = `${w.title}_第${nums[0]}〜${nums[nums.length-1]}話.txt`;
+  }
+  download(name.replace(/[\\/:*?"<>|]/g,"-"), buildTxt(w, chapters), "text/plain");
   closeModal();
 }
 
@@ -846,7 +903,11 @@ $("#importFile").addEventListener("change", function(){
   r.readAsText(f);
 });
 function download(name, content, type){
-  const blob = new Blob([content], {type:type+";charset=utf-8"});
+  // TXTはWindowsのメモ帳でも化けへんよう、頭にBOMを付ける
+  const parts = (type === "text/plain")
+    ? [new Uint8Array([0xEF,0xBB,0xBF]), content]
+    : [content];
+  const blob = new Blob(parts, {type:type+";charset=utf-8"});
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = name;
   document.body.appendChild(a); a.click();
