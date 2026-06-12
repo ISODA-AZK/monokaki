@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>物書き帖</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#F7F4ED">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{
+  --paper:#F7F4ED;
+  --sheet:#FFFDF8;
+  --ink:#2B2A28;
+  --ink-soft:#6E685E;
+  --ai:#234A7C;
+  --ai-weak:#E8EEF6;
+  --shu:#B5402B;
+  --line:#E5DFD2;
+  --serif:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+  --sans:"Hiragino Sans","Yu Gothic","Noto Sans JP",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+#app{max-width:680px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
+
+/* ---- 秘モード：入力欄を■で隠す ---- */
+body.secret .ed-body,
+body.secret .ed-title,
+body.secret textarea,
+body.secret input[type=text]{
+  -webkit-text-security:square;
+}
+
+/* ---- ヘッダー ---- */
+.hdr{
+  position:sticky;top:0;z-index:10;background:var(--paper);
+  display:flex;align-items:center;gap:8px;
+  padding:calc(env(safe-area-inset-top) + 12px) 14px 10px;
+  border-bottom:1px solid var(--line);
+}
+.hdr h1{font-family:var(--serif);font-size:18px;font-weight:600;flex:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr .sub{font-size:13px;color:var(--ink-soft);font-weight:400}
+.iconbtn{
+  border:1px solid var(--line);background:var(--sheet);color:var(--ink);
+  border-radius:8px;padding:7px 12px;font-size:13px;font-family:var(--sans);
+  cursor:pointer;flex-shrink:0;
+}
+.iconbtn.primary{background:var(--ai);border-color:var(--ai);color:#fff}
+.iconbtn.danger{color:var(--shu);border-color:#E5C7BF}
+.secretbtn{
+  border:1px solid var(--line);background:var(--sheet);color:var(--ink-soft);
+  border-radius:8px;padding:7px 12px;font-size:13px;font-family:var(--serif);
+  cursor:pointer;flex-shrink:0;
+}
+.secretbtn.on{background:var(--ink);border-color:var(--ink);color:#fff}
+
+/* ---- 本体 ---- */
+.main{flex:1;padding:14px 14px calc(env(safe-area-inset-bottom) + 84px)}
+.main.editor-main{padding-bottom:calc(env(safe-area-inset-bottom) + 14px)}
+
+/* ---- カード ---- */
+.card{
+  background:var(--sheet);border:1px solid var(--line);border-radius:10px;
+  padding:13px 14px;margin-bottom:10px;cursor:pointer;
+}
+.card:active{background:#FBF7EE}
+.card .t{font-family:var(--serif);font-size:16px;font-weight:600;word-break:break-all}
+.card .m{font-size:12px;color:var(--ink-soft);margin-top:3px}
+.card .preview{font-size:13px;color:var(--ink-soft);margin-top:6px;word-break:break-all;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card .total{font-family:var(--serif);font-size:13px;color:var(--ai);margin-top:4px}
+
+.charcard{display:flex;gap:12px;align-items:flex-start}
+.charcard .face{
+  width:56px;height:56px;border-radius:8px;object-fit:cover;flex-shrink:0;
+  border:1px solid var(--line);background:#EFEAE0;
+}
+.face-ph{
+  width:56px;height:56px;border-radius:8px;flex-shrink:0;border:1px solid var(--line);
+  background:#EFEAE0;color:var(--ink-soft);display:flex;align-items:center;justify-content:center;
+  font-family:var(--serif);font-size:18px;
+}
+.face-secret{
+  width:56px;height:56px;border-radius:8px;flex-shrink:0;border:1px solid var(--line);
+  background:#D8D2C4;color:#8A8273;display:flex;align-items:center;justify-content:center;
+  font-size:20px;
+}
+
+.empty{text-align:center;color:var(--ink-soft);padding:48px 20px;font-size:14px}
+.empty .big{font-family:var(--serif);font-size:17px;margin-bottom:8px;color:var(--ink)}
+
+/* ---- 画像グリッド ---- */
+.imggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.imgcell{background:var(--sheet);border:1px solid var(--line);border-radius:10px;
+  overflow:hidden;cursor:pointer}
+.imgcell img{width:100%;height:120px;object-fit:cover;display:block;background:#EFEAE0}
+.imgcell .cap{font-size:12px;padding:6px 9px;color:var(--ink);word-break:break-all;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.imgcell .secretbox{width:100%;height:120px;background:#D8D2C4;color:#8A8273;
+  display:flex;align-items:center;justify-content:center;font-size:26px}
+
+/* ---- 下タブ ---- */
+.tabs{
+  position:fixed;bottom:0;left:0;right:0;z-index:10;
+  background:var(--sheet);border-top:1px solid var(--line);
+  display:flex;max-width:680px;margin:0 auto;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.tabs button{
+  flex:1;border:none;background:none;padding:10px 0 9px;cursor:pointer;
+  font-family:var(--sans);font-size:11px;color:var(--ink-soft);
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+}
+.tabs button .g{font-family:var(--serif);font-size:17px;line-height:1}
+.tabs button.on{color:var(--ai);font-weight:600}
+.tabs button.on .g{border-bottom:2px solid var(--ai)}
+
+/* ---- 入力 ---- */
+.field{margin-bottom:12px}
+.field label{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:4px}
+input[type=text],textarea,select{
+  width:100%;border:1px solid var(--line);border-radius:8px;background:var(--sheet);
+  padding:9px 11px;font-size:15px;color:var(--ink);font-family:var(--sans);
+}
+textarea{resize:vertical;min-height:90px;line-height:1.7}
+input:focus,textarea:focus{outline:2px solid var(--ai);outline-offset:-1px}
+
+/* ---- 執筆エディタ ---- */
+.ed-title{
+  font-family:var(--serif);font-size:17px;font-weight:600;border:none;background:none;
+  width:100%;padding:4px 2px;border-bottom:1px dashed var(--line);
+}
+.ed-title:focus{outline:none;border-bottom-color:var(--ai)}
+.ed-body{
+  font-family:var(--serif);font-size:16px;line-height:2.0;letter-spacing:.02em;
+  border:none;background:none;width:100%;min-height:60vh;padding:12px 2px;resize:none;
+}
+.ed-body:focus{outline:none}
+.counter{
+  position:sticky;bottom:0;background:var(--paper);
+  border-top:1px solid var(--line);padding:8px 2px calc(env(safe-area-inset-bottom) + 8px);
+  font-size:12px;color:var(--ink-soft);display:flex;justify-content:space-between;align-items:center;
+}
+.counter .maisu{font-family:var(--serif);color:var(--ink);font-size:13px}
+.counter .maisu b{font-size:16px;color:var(--ai)}
+.savemark{font-size:11px;color:var(--ink-soft)}
+
+/* ---- 縦書きプレビュー ---- */
+.tate-wrap{position:fixed;inset:0;z-index:50;background:var(--sheet);display:flex;flex-direction:column}
+.tate-bar{display:flex;justify-content:space-between;align-items:center;
+  padding:calc(env(safe-area-inset-top) + 10px) 14px 8px;border-bottom:1px solid var(--line)}
+.tate-bar .t{font-family:var(--serif);font-weight:600}
+.tate-body{
+  flex:1;overflow-x:auto;overflow-y:hidden;padding:18px 16px;
+  writing-mode:vertical-rl;font-family:var(--serif);font-size:17px;line-height:2.1;
+  letter-spacing:.04em;white-space:pre-wrap;
+}
+
+/* ---- モーダル ---- */
+.modal-bg{position:fixed;inset:0;background:rgba(43,42,40,.35);z-index:40;
+  display:flex;align-items:flex-end;justify-content:center}
+.modal{
+  background:var(--sheet);border-radius:14px 14px 0 0;width:100%;max-width:680px;
+  padding:18px 16px calc(env(safe-area-inset-bottom) + 18px);
+  max-height:88vh;overflow-y:auto;
+}
+.modal h2{font-family:var(--serif);font-size:16px;margin-bottom:14px}
+.modal .row{display:flex;gap:8px;margin-top:14px}
+.modal .row .iconbtn{flex:1;padding:11px;text-align:center}
+.modal .bigimg{width:100%;max-height:52vh;object-fit:contain;border-radius:8px;
+  background:#EFEAE0;border:1px solid var(--line);margin-bottom:12px}
+.modal .bigimg-secret{width:100%;height:200px;border-radius:8px;background:#D8D2C4;
+  color:#8A8273;display:flex;align-items:center;justify-content:center;font-size:34px;
+  border:1px solid var(--line);margin-bottom:12px}
+.imgpick{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.imgpick .face,.imgpick .face-ph,.imgpick .face-secret{width:72px;height:72px}
+
+.menu-item{
+  display:block;width:100%;text-align:left;background:none;border:none;
+  border-bottom:1px solid var(--line);padding:13px 4px;font-size:15px;
+  font-family:var(--sans);color:var(--ink);cursor:pointer;
+}
+.menu-item.danger{color:var(--shu)}
+.menu-item:last-child{border-bottom:none}
+.note{font-size:12px;color:var(--ink-soft);margin-top:10px;line-height:1.7}
+
+.fab{
+  position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom) + 72px);z-index:9;
+  width:52px;height:52px;border-radius:50%;border:none;background:var(--ai);color:#fff;
+  font-size:26px;line-height:1;cursor:pointer;box-shadow:0 3px 10px rgba(35,74,124,.35);
+}
+.fab.home{bottom:calc(env(safe-area-inset-bottom) + 20px)}
+.badge{display:inline-block;font-size:11px;color:var(--ai);background:var(--ai-weak);
+  border-radius:5px;padding:1px 7px;margin-right:6px;font-family:var(--sans)}
+.totalbar{
+  background:var(--sheet);border:1px solid var(--line);border-radius:10px;
+  padding:10px 14px;margin-bottom:12px;font-family:var(--serif);font-size:13px;
+}
+.totalbar b{color:var(--ai);font-size:17px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<input type="file" id="importFile" accept=".json,application/json" style="display:none">
+<input type="file" id="imgFile" accept="image/*" style="display:none">
+
+<script>
+"use strict";
+/* ============================================================
+   保存層：IndexedDB（大容量）優先、使えへん環境では localStorage
+   ============================================================ */
+const LS_KEY = "monokakicho_v1";
+const SECRET_KEY = "monokakicho_secret";
+const MIGRATED_KEY = "monokakicho_migrated";
+const DB_NAME = "monokakicho";
+const STORE = "works";
+
+let data = { works: [] };
+let db = null;
+let useIDB = false;
+
+function migrate(d){
+  (d.works||[]).forEach(w=>{
+    if(!w.chapters) w.chapters = [];
+    if(!w.images) w.images = [];
+    if(!w.plots) w.plots = [];
+    if(!w.chars) w.chars = [];
+    if(!w.notes) w.notes = [];
+  });
+  return d;
+}
+
+/* ---- IndexedDB ラッパ ---- */
+function openDB(){
+  return new Promise(res=>{
+    if(!window.indexedDB){ res(null); return; }
+    let req;
+    try{ req = indexedDB.open(DB_NAME, 1); }catch(e){ res(null); return; }
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if(!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, {keyPath:"id"});
+    };
+    req.onsuccess = e => res(e.target.result);
+    req.onerror = () => res(null);
+    req.onblocked = () => res(null);
+  });
+}
+function idbAll(){
+  return new Promise(res=>{
+    try{
+      const rq = db.transaction(STORE,"readonly").objectStore(STORE).getAll();
+      rq.onsuccess = () => res(rq.result||[]);
+      rq.onerror = () => res(null);
+    }catch(e){ res(null); }
+  });
+}
+function idbPut(w){
+  return new Promise(res=>{
+    try{
+      const tx = db.transaction(STORE,"readwrite");
+      tx.objectStore(STORE).put(w);
+      tx.oncomplete = () => res(true);
+      tx.onerror = () => res(false);
+      tx.onabort = () => res(false);
+    }catch(e){ res(false); }
+  });
+}
+function idbDel(id){
+  return new Promise(res=>{
+    try{
+      const tx = db.transaction(STORE,"readwrite");
+      tx.objectStore(STORE).delete(id);
+      tx.oncomplete = () => res(true);
+      tx.onerror = () => res(false);
+    }catch(e){ res(false); }
+  });
+}
+function idbClear(){
+  return new Promise(res=>{
+    try{
+      const tx = db.transaction(STORE,"readwrite");
+      tx.objectStore(STORE).clear();
+      tx.oncomplete = () => res(true);
+      tx.onerror = () => res(false);
+    }catch(e){ res(false); }
+  });
+}
+
+/* ---- localStorage 予備 ---- */
+function loadLS(){
+  try{ const raw = localStorage.getItem(LS_KEY); if(raw) return migrate(JSON.parse(raw)); }
+  catch(e){}
+  return { works: [] };
+}
+function saveLS(){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(data)); markSaved(); }
+  catch(e){
+    if(e && (e.name==="QuotaExceededError" || e.code===22)){
+      alert("端末の保存容量がいっぱいです。画像を減らすか、JSONで控えを取ってから整理してください。");
+      markSaved("※容量超過：保存できていません");
+    } else markSaved("※この環境では端末保存不可（書き出し推奨）");
+  }
+}
+
+/* ---- 保存の入口（呼ぶ側はこの3つだけ） ---- */
+function persistWork(w){
+  if(!w) return;
+  if(useIDB){
+    idbPut(w).then(ok => markSaved(ok ? null : "※保存に失敗しました（容量確認を）"));
+  } else saveLS();
+}
+function removeWorkRecord(id){
+  if(useIDB) idbDel(id);
+  else saveLS();
+}
+async function persistAll(){
+  if(useIDB){
+    await idbClear();
+    for(const w of data.works) await idbPut(w);
+    markSaved();
+  } else saveLS();
+}
+
+/* ---- 起動：IDBを開き、旧localStorageデータがあれば引っ越し ---- */
+async function init(){
+  db = await openDB();
+  useIDB = !!db;
+  if(useIDB){
+    let works = await idbAll();
+    if(works === null){ useIDB = false; }
+    else {
+      let migrated = false;
+      try{ migrated = localStorage.getItem(MIGRATED_KEY)==="1"; }catch(e){}
+      if(!works.length && !migrated){
+        try{
+          const raw = localStorage.getItem(LS_KEY);
+          if(raw){
+            const old = migrate(JSON.parse(raw));
+            works = old.works || [];
+            for(const w of works) await idbPut(w);
+          }
+        }catch(e){}
+        try{ localStorage.setItem(MIGRATED_KEY,"1"); }catch(e){}
+      }
+      data = migrate({works});
+      data.works.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+      try{
+        if(navigator.storage && navigator.storage.persist) navigator.storage.persist();
+      }catch(e){}
+    }
+  }
+  if(!useIDB) data = loadLS();
+  applySecret();
+  render();
+}
+
+/* ============ 秘モード ============ */
+let secret = false;
+try{ secret = localStorage.getItem(SECRET_KEY)==="1"; }catch(e){}
+function applySecret(){ document.body.classList.toggle("secret", secret); }
+function toggleSecret(){
+  secret = !secret;
+  try{ localStorage.setItem(SECRET_KEY, secret ? "1" : "0"); }catch(e){}
+  applySecret(); render();
+}
+function mask(s, max){
+  const t = s||"";
+  if(!secret) return esc(t);
+  const n = Math.min(t.replace(/\s/g,"").length, max||30);
+  return "■".repeat(Math.max(n,1));
+}
+function secretBtn(){
+  return `<button class="secretbtn ${secret?'on':''}" onclick="toggleSecret()" title="シークレットモード">秘</button>`;
+}
+
+/* ============ 共通 ============ */
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const esc = s => (s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtDate = ts => { const d = new Date(ts); return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`; };
+function countChars(s){ return (s||"").replace(/\s/g,"").length; }
+function genkou(s){
+  const n = (s||"").replace(/\s/g,"").length;
+  return { mai: Math.floor(n/400), ji: n%400, n };
+}
+function fmtBytes(b){
+  if(b == null) return "不明";
+  if(b >= 1073741824) return (b/1073741824).toFixed(2)+" GB";
+  if(b >= 1048576) return (b/1048576).toFixed(1)+" MB";
+  return Math.round(b/1024)+" KB";
+}
+const $ = sel => document.querySelector(sel);
+
+/* ============ 画面状態 ============ */
+let view = { screen:"home", workId:null, tab:"write", itemId:null };
+let saveTimer = null;
+function go(v){ view = Object.assign({}, view, v); render(); }
+function getWork(){ return data.works.find(w=>w.id===view.workId); }
+
+function markSaved(msg){
+  const el = $("#savemark");
+  if(el){ el.textContent = msg || "保存しました"; setTimeout(()=>{ if($("#savemark")) $("#savemark").textContent=""; }, 1500); }
+}
+function queueSave(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>persistWork(getWork()), 400);
+}
+
+/* ============ 画像取り込み（縮小・圧縮してから保存） ============ */
+let imgCallback = null;
+function pickImage(cb){
+  imgCallback = cb;
+  $("#imgFile").click();
+}
+$("#imgFile").addEventListener("change", function(){
+  const f = this.files[0]; this.value = "";
+  if(!f || !imgCallback) return;
+  const r = new FileReader();
+  r.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = useIDB ? 1280 : 720;   /* 大容量保存なら高めの画質で */
+      let w = img.width, h = img.height;
+      if(w > MAX || h > MAX){
+        const k = MAX / Math.max(w,h);
+        w = Math.round(w*k); h = Math.round(h*k);
+      }
+      const cv = document.createElement("canvas");
+      cv.width = w; cv.height = h;
+      const ctx = cv.getContext("2d");
+      ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0,0,w,h);
+      ctx.drawImage(img, 0, 0, w, h);
+      const dataUrl = cv.toDataURL("image/jpeg", useIDB ? 0.82 : 0.78);
+      const cb = imgCallback; imgCallback = null;
+      cb(dataUrl);
+    };
+    img.onerror = () => alert("画像を読み込めませんでした。");
+    img.src = r.result;
+  };
+  r.readAsDataURL(f);
+});
+
+/* ============ 描画 ============ */
+const app = $("#app");
+function render(){
+  if(view.screen==="home") renderHome();
+  else if(view.screen==="work") renderWork();
+  else if(view.screen==="editor") renderEditor();
+}
+
+/* ---- 作品一覧 ---- */
+function renderHome(){
+  const list = data.works.map(w=>{
+    const g = genkou(w.chapters.map(c=>c.body).join(""));
+    return `<div class="card" onclick="go({screen:'work',workId:'${w.id}',tab:'write'})">
+      <div class="t">${mask(w.title, 14) || "無題の作品"}</div>
+      <div class="total">総文字数 <b>${g.n.toLocaleString()}</b>字（原稿用紙 ${g.mai}枚と${g.ji}字）</div>
+      <div class="m">全${w.chapters.length}話 ・ 画像${(w.images||[]).length}枚 ・ ${fmtDate(w.updatedAt)}</div>
+    </div>`;
+  }).join("");
+  app.innerHTML = `
+    <div class="hdr">
+      <h1>物書き帖</h1>
+      ${secretBtn()}
+      <button class="iconbtn" onclick="openBackupMenu()">控え</button>
+    </div>
+    <div class="main" style="padding-bottom:90px">
+      ${data.works.length ? list : `
+        <div class="empty">
+          <div class="big">まだ作品がおへん</div>
+          右下の「＋」から、最初の一作を始めとくれやす。
+        </div>`}
+    </div>
+    <button class="fab home" onclick="newWork()">＋</button>
+  `;
+}
+function newWork(){
+  const title = prompt("作品のタイトルは？");
+  if(title===null) return;
+  const w = { id:uid(), title:title.trim()||"無題の作品",
+    createdAt:Date.now(), updatedAt:Date.now(),
+    chapters:[], plots:[], chars:[], notes:[], images:[] };
+  data.works.unshift(w); persistWork(w);
+  go({screen:"work", workId:w.id, tab:"write"});
+}
+
+/* ---- 作品内（タブ） ---- */
+const TABS = [
+  {id:"write", g:"筆", label:"執筆"},
+  {id:"plot",  g:"序", label:"プロット"},
+  {id:"chars", g:"人", label:"人物"},
+  {id:"notes", g:"資", label:"資料"},
+  {id:"images",g:"画", label:"画像"},
+];
+function renderWork(){
+  const w = getWork(); if(!w){ go({screen:"home"}); return; }
+  let body = "";
+  if(view.tab==="write") body = tabWrite(w);
+  else if(view.tab==="plot") body = tabCards(w,"plots","プロットがおへん","「＋」で起承転結のメモから始めるとよろし。");
+  else if(view.tab==="chars") body = tabChars(w);
+  else if(view.tab==="images") body = tabImages(w);
+  else body = tabCards(w,"notes","資料メモがおへん","世界観・用語・地名なんでも書き留めとくれやす。");
+
+  const total = genkou(w.chapters.map(c=>c.body).join(""));
+  app.innerHTML = `
+    <div class="hdr">
+      <button class="iconbtn" onclick="go({screen:'home'})">‹ 一覧</button>
+      <h1>${mask(w.title, 12)}</h1>
+      ${secretBtn()}
+      <button class="iconbtn" onclick="openWorkMenu()">⋯</button>
+    </div>
+    <div class="main">
+      <div class="totalbar">この作品の総文字数　<b>${total.n.toLocaleString()}</b>字（原稿用紙 ${total.mai}枚と${total.ji}字）</div>
+      ${body}
+    </div>
+    <button class="fab" onclick="addItem()">＋</button>
+    <nav class="tabs">
+      ${TABS.map(t=>`<button class="${view.tab===t.id?'on':''}" onclick="go({tab:'${t.id}'})">
+        <span class="g">${t.g}</span>${t.label}</button>`).join("")}
+    </nav>
+  `;
+}
+function tabWrite(w){
+  if(!w.chapters.length) return `<div class="empty"><div class="big">まだ一話もおへん</div>「＋」で第一話を書き始めとくれやす。</div>`;
+  return w.chapters.map((c,i)=>{
+    const g = genkou(c.body);
+    return `<div class="card" onclick="go({screen:'editor',itemId:'${c.id}'})">
+      <div class="t"><span class="badge">${i+1}</span>${mask(c.title, 14) || "無題"}</div>
+      <div class="m">${g.n.toLocaleString()}字（${g.mai}枚と${g.ji}字） ・ ${fmtDate(c.updatedAt)}</div>
+      <div class="preview">${mask((c.body||"").slice(0,80), 40)}</div>
+    </div>`;
+  }).join("");
+}
+function tabCards(w, key, emptyT, emptyM){
+  if(!w[key].length) return `<div class="empty"><div class="big">${emptyT}</div>${emptyM}</div>`;
+  return w[key].map(p=>`<div class="card" onclick="editCard('${key}','${p.id}')">
+      <div class="t">${mask(p.title, 14) || "無題"}</div>
+      <div class="preview">${mask((p.body||"").slice(0,100), 50)}</div>
+    </div>`).join("");
+}
+function tabChars(w){
+  if(!w.chars.length) return `<div class="empty"><div class="big">登場人物がおへん</div>「＋」で人物帖を作っとくれやす。</div>`;
+  return w.chars.map(c=>{
+    let face;
+    if(c.img && secret) face = `<div class="face-secret">秘</div>`;
+    else if(c.img) face = `<img class="face" src="${c.img}" alt="">`;
+    else face = `<div class="face-ph">人</div>`;
+    return `<div class="card charcard" onclick="editChar('${c.id}')">
+      ${face}
+      <div style="flex:1;min-width:0">
+        <div class="t">${mask(c.name, 10) || "名無し"}</div>
+        <div class="m">${mask(c.role, 8)}${c.age?` ・ ${mask(c.age,6)}`:""}</div>
+        <div class="preview">${mask((c.traits||"").slice(0,100), 40)}</div>
+      </div>
+    </div>`;
+  }).join("");
+}
+function tabImages(w){
+  if(!(w.images||[]).length) return `<div class="empty"><div class="big">画像がおへん</div>「＋」でスマホの写真や資料画像を追加できますえ。</div>`;
+  return `<div class="imggrid">` + w.images.map(p=>{
+    const pic = secret
+      ? `<div class="secretbox">秘</div>`
+      : `<img src="${p.img}" alt="" loading="lazy">`;
+    return `<div class="imgcell" onclick="viewImage('${p.id}')">
+      ${pic}<div class="cap">${mask(p.title, 10) || "無題の画像"}</div>
+    </div>`;
+  }).join("") + `</div>`;
+}
+
+/* ---- 追加 ---- */
+function addItem(){
+  const w = getWork(); if(!w) return;
+  if(view.tab==="write"){
+    const c = { id:uid(), title:`第${w.chapters.length+1}話`, body:"", updatedAt:Date.now() };
+    w.chapters.push(c); w.updatedAt = Date.now(); persistWork(w);
+    go({screen:"editor", itemId:c.id});
+  } else if(view.tab==="plot"){
+    openModal(`
+      <h2>プロットを追加</h2>
+      <button class="menu-item" onclick="addPlot('blank')">白紙のメモを追加</button>
+      <button class="menu-item" onclick="addPlot('kishotenketsu')">テンプレで追加（テーマ・あらすじ・起承転結）</button>
+      <div class="row"><button class="iconbtn" onclick="closeModal()">やめとく</button></div>
+    `);
+  } else if(view.tab==="chars"){
+    editChar(null);
+  } else if(view.tab==="images"){
+    pickImage(dataUrl=>{
+      const w2 = getWork(); if(!w2) return;
+      w2.images.push({id:uid(), title:"", img:dataUrl});
+      w2.updatedAt = Date.now(); persistWork(w2); render();
+      viewImage(w2.images[w2.images.length-1].id);
+    });
+  } else {
+    editCard("notes", null);
+  }
+}
+function addPlot(kind){
+  const w = getWork(); closeModal();
+  if(kind==="blank"){ editCard("plots", null); return; }
+  const tpl = ["作品テーマ","あらすじ","起：物語の始まり","承：展開","転：転換点","結：結末"];
+  tpl.forEach(t=> w.plots.push({id:uid(), title:t, body:""}));
+  w.updatedAt = Date.now(); persistWork(w); render();
+}
+
+/* ---- 作品内画像の閲覧・編集 ---- */
+function viewImage(id){
+  const w = getWork(); const p = w.images.find(x=>x.id===id);
+  if(!p) return;
+  editing = {key:"images", id};
+  const pic = secret
+    ? `<div class="bigimg-secret">秘</div>`
+    : `<img class="bigimg" src="${p.img}" alt="">`;
+  openModal(`
+    <h2>画像</h2>
+    ${pic}
+    <div class="field"><label>タイトル・メモ</label><input type="text" id="f_title" value="${esc(p.title)}"></div>
+    <div class="row">
+      <button class="iconbtn danger" onclick="deleteCard()">削除</button>
+      <button class="iconbtn" onclick="closeModal()">閉じる</button>
+      <button class="iconbtn primary" onclick="saveImageTitle()">保存する</button>
+    </div>
+    ${secret?'<div class="note">秘モード中は画像を表示しまへん。「秘」を解除すると見られます。</div>':''}
+  `);
+}
+function saveImageTitle(){
+  const w = getWork(); const p = w.images.find(x=>x.id===editing.id);
+  if(p){ p.title = $("#f_title").value.trim(); w.updatedAt = Date.now(); persistWork(w); }
+  closeModal(); render();
+}
+
+/* ---- カード編集（プロット・資料） ---- */
+let editing = null;
+function editCard(key, id){
+  const w = getWork();
+  const item = id ? w[key].find(x=>x.id===id) : {id:null, title:"", body:""};
+  editing = {key, id};
+  const isPlot = key==="plots";
+  openModal(`
+    <h2>${isPlot?"プロット":"資料メモ"}${id?"を編集":"を追加"}</h2>
+    <div class="field"><label>タイトル</label><input type="text" id="f_title" value="${esc(item.title)}"></div>
+    <div class="field"><label>内容</label><textarea id="f_body" rows="8">${esc(item.body)}</textarea></div>
+    <div class="row">
+      ${id?`<button class="iconbtn danger" onclick="deleteCard()">削除</button>`:""}
+      <button class="iconbtn" onclick="closeModal()">やめとく</button>
+      <button class="iconbtn primary" onclick="saveCard()">保存する</button>
+    </div>
+  `);
+}
+function saveCard(){
+  const w = getWork(); const {key,id} = editing;
+  const title = $("#f_title").value.trim(), body = $("#f_body").value;
+  if(id){ const it = w[key].find(x=>x.id===id); it.title=title; it.body=body; }
+  else w[key].push({id:uid(), title, body});
+  w.updatedAt = Date.now(); persistWork(w); closeModal(); render();
+}
+function deleteCard(){
+  if(!confirm("ほんまに削除してよろしおすか？")) return;
+  const w = getWork(); const {key,id} = editing;
+  w[key] = w[key].filter(x=>x.id!==id);
+  w.updatedAt = Date.now(); persistWork(w); closeModal(); render();
+}
+
+/* ---- 人物編集（顔画像付き） ---- */
+let charImgTemp = null;
+function editChar(id){
+  const w = getWork();
+  const c = id ? w.chars.find(x=>x.id===id) : {name:"",role:"",age:"",traits:"",note:"",img:null};
+  editing = {key:"chars", id};
+  charImgTemp = c.img || null;
+  openModal(`
+    <h2>登場人物${id?"を編集":"を追加"}</h2>
+    <div class="imgpick" id="f_imgpick">${charImgHtml()}
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <button class="iconbtn" onclick="pickCharImg()">画像を選ぶ</button>
+        <button class="iconbtn danger" onclick="clearCharImg()">画像を外す</button>
+      </div>
+    </div>
+    <div class="field"><label>名前</label><input type="text" id="f_name" value="${esc(c.name)}"></div>
+    <div class="field"><label>役割（主人公・敵役など）</label><input type="text" id="f_role" value="${esc(c.role)}"></div>
+    <div class="field"><label>年齢</label><input type="text" id="f_age" value="${esc(c.age)}"></div>
+    <div class="field"><label>性格・特徴</label><textarea id="f_traits" rows="4">${esc(c.traits)}</textarea></div>
+    <div class="field"><label>備考</label><textarea id="f_note" rows="3">${esc(c.note)}</textarea></div>
+    <div class="row">
+      ${id?`<button class="iconbtn danger" onclick="deleteCard()">削除</button>`:""}
+      <button class="iconbtn" onclick="closeModal()">やめとく</button>
+      <button class="iconbtn primary" onclick="saveChar()">保存する</button>
+    </div>
+  `);
+}
+function charImgHtml(){
+  if(charImgTemp && secret) return `<div class="face-secret">秘</div>`;
+  if(charImgTemp) return `<img class="face" src="${charImgTemp}" alt="">`;
+  return `<div class="face-ph">人</div>`;
+}
+function refreshCharImg(){
+  const box = $("#f_imgpick");
+  if(box) box.firstElementChild.outerHTML = charImgHtml();
+}
+function pickCharImg(){
+  pickImage(dataUrl=>{ charImgTemp = dataUrl; refreshCharImg(); });
+}
+function clearCharImg(){ charImgTemp = null; refreshCharImg(); }
+function saveChar(){
+  const w = getWork(); const {id} = editing;
+  const v = k => $("#f_"+k).value;
+  const obj = {name:v("name").trim(), role:v("role").trim(), age:v("age").trim(),
+    traits:v("traits"), note:v("note"), img:charImgTemp};
+  if(id) Object.assign(w.chars.find(x=>x.id===id), obj);
+  else w.chars.push(Object.assign({id:uid()}, obj));
+  w.updatedAt = Date.now(); persistWork(w); closeModal(); render();
+}
+
+/* ---- 執筆エディタ ---- */
+function renderEditor(){
+  const w = getWork(); if(!w){ go({screen:"home"}); return; }
+  const c = w.chapters.find(x=>x.id===view.itemId);
+  if(!c){ go({screen:"work"}); return; }
+  app.innerHTML = `
+    <div class="hdr">
+      <button class="iconbtn" onclick="go({screen:'work'})">‹ 戻る</button>
+      <h1 class="sub">${mask(w.title, 10)}</h1>
+      ${secretBtn()}
+      <button class="iconbtn" onclick="openTate()">縦書き</button>
+      <button class="iconbtn danger" onclick="deleteChapter()">削除</button>
+    </div>
+    <div class="main editor-main">
+      <input class="ed-title" id="ed_title" value="${esc(c.title)}" placeholder="話のタイトル">
+      <textarea class="ed-body" id="ed_body" placeholder="ここに本文を書いとくれやす。">${esc(c.body)}</textarea>
+      <div class="counter">
+        <span class="maisu" id="ed_count"></span>
+        <span class="savemark" id="savemark"></span>
+      </div>
+    </div>
+  `;
+  const tEl = $("#ed_title"), bEl = $("#ed_body");
+  const update = ()=>{
+    c.title = tEl.value; c.body = bEl.value;
+    c.updatedAt = Date.now(); w.updatedAt = Date.now();
+    updateCount(c.body); queueSave();
+  };
+  tEl.addEventListener("input", update);
+  bEl.addEventListener("input", update);
+  updateCount(c.body);
+}
+function updateCount(body){
+  const g = genkou(body);
+  $("#ed_count").innerHTML = `${g.n.toLocaleString()}字　原稿用紙 <b>${g.mai}</b>枚と<b>${g.ji}</b>字`;
+}
+function deleteChapter(){
+  if(!confirm("この話をほんまに削除してよろしおすか？")) return;
+  const w = getWork();
+  w.chapters = w.chapters.filter(x=>x.id!==view.itemId);
+  w.updatedAt = Date.now(); persistWork(w);
+  go({screen:"work"});
+}
+function openTate(){
+  const w = getWork(); const c = w.chapters.find(x=>x.id===view.itemId);
+  const body = secret ? (c.body||"").replace(/[^\n]/g,"■") : (c.body||"");
+  const div = document.createElement("div");
+  div.className = "tate-wrap"; div.id = "tate";
+  div.innerHTML = `
+    <div class="tate-bar">
+      <span class="t">${mask(c.title, 12) || "無題"}</span>
+      <button class="iconbtn" onclick="document.getElementById('tate').remove()">閉じる</button>
+    </div>
+    <div class="tate-body">${esc(body)||"（本文がおへん）"}</div>
+  `;
+  document.body.appendChild(div);
+}
+
+/* ---- 作品メニュー ---- */
+function openWorkMenu(){
+  openModal(`
+    <h2>作品の操作</h2>
+    <button class="menu-item" onclick="renameWork()">タイトルを変更</button>
+    <button class="menu-item" onclick="exportTxt()">本文をTXTで書き出す</button>
+    <button class="menu-item danger" onclick="deleteWork()">この作品を削除</button>
+    <div class="row"><button class="iconbtn" onclick="closeModal()">閉じる</button></div>
+  `);
+}
+function renameWork(){
+  const w = getWork();
+  const t = prompt("新しいタイトルは？", w.title);
+  if(t===null) return;
+  w.title = t.trim()||w.title; w.updatedAt = Date.now();
+  persistWork(w); closeModal(); render();
+}
+function deleteWork(){
+  const w = getWork();
+  if(!confirm(`「${w.title}」を本文ごとすべて削除します。ほんまによろしおすか？`)) return;
+  data.works = data.works.filter(x=>x.id!==w.id);
+  removeWorkRecord(w.id); closeModal(); go({screen:"home"});
+}
+function exportTxt(){
+  const w = getWork();
+  const txt = `${w.title}\n\n` + w.chapters.map(c=>`【${c.title}】\n\n${c.body}`).join("\n\n\n");
+  download(`${w.title}.txt`, txt, "text/plain");
+  closeModal();
+}
+
+/* ---- 控え（バックアップ） ---- */
+function openBackupMenu(){
+  openModal(`
+    <h2>控え（バックアップ）</h2>
+    <button class="menu-item" onclick="exportJson()">全データをJSONで書き出す</button>
+    <button class="menu-item" onclick="document.getElementById('importFile').click()">JSONから読み込む（復元）</button>
+    <div class="note" id="quotaNote">
+      保存方式：${useIDB ? "IndexedDB（大容量）" : "localStorage（目安5MB）"}<br>
+      データはこの端末のブラウザにだけ保存されてます。ブラウザのデータ消去で消えるさかい、節目ごとにJSONの控えを取っとくのが安心どす。
+    </div>
+    <div class="row"><button class="iconbtn" onclick="closeModal()">閉じる</button></div>
+  `);
+  try{
+    if(navigator.storage && navigator.storage.estimate){
+      navigator.storage.estimate().then(e=>{
+        const el = $("#quotaNote");
+        if(el && e && e.quota){
+          el.innerHTML += `<br>使用量：${fmtBytes(e.usage)} ／ 上限の目安：${fmtBytes(e.quota)}`;
+        }
+      });
+    }
+  }catch(e){}
+}
+function exportJson(){
+  const d = new Date();
+  const stamp = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`;
+  download(`物書き帖_控え_${stamp}.json`, JSON.stringify(data), "application/json");
+  closeModal();
+}
+$("#importFile").addEventListener("change", function(){
+  const f = this.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      const d = migrate(JSON.parse(r.result));
+      if(!d || !Array.isArray(d.works)) throw new Error("形式が違います");
+      if(!confirm(`読み込むと今のデータは置き換わります（作品${d.works.length}件）。よろしおすか？`)) return;
+      data = d;
+      persistAll().then(()=>{ closeModal(); go({screen:"home"}); alert("読み込みました。"); });
+    }catch(e){ alert("読み込めませんでした：JSONの形式をご確認ください。"); }
+    this.value = "";
+  };
+  r.readAsText(f);
+});
+function download(name, content, type){
+  const blob = new Blob([content], {type:type+";charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+/* ---- モーダル ---- */
+function openModal(html){
+  closeModal();
+  const bg = document.createElement("div");
+  bg.className = "modal-bg"; bg.id = "modalbg";
+  bg.innerHTML = `<div class="modal">${html}</div>`;
+  bg.addEventListener("click", e => { if(e.target===bg) closeModal(); });
+  document.body.appendChild(bg);
+}
+function closeModal(){ const m = $("#modalbg"); if(m) m.remove(); }
+
+
+/* ---- PWA：オフライン用サービスワーカー登録（https時のみ） ---- */
+try{
+  if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost')){
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  }
+}catch(e){}
+
+init();
+</script>
+</body>
+</html>
