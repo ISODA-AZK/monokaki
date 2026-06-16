@@ -23,10 +23,29 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
+
+/* ===== テーマ（背景色） ===== */
+body[data-theme="dark"]{
+  --paper:#1A1A1C; --sheet:#242427; --ink:#E8E5DE; --ink-soft:#9A958B;
+  --ai:#8FB4E8; --ai-weak:#2A3340; --shu:#E08B76; --line:#36363A;
+}
+body[data-theme="sepia"]{
+  --paper:#EFE6D3; --sheet:#F7EFDD; --ink:#3A3026; --ink-soft:#7A6F5C;
+  --ai:#1F5A8C; --ai-weak:#E2E9F0; --shu:#B5402B; --line:#DDD2BB;
+}
+body[data-theme="mint"]{
+  --paper:#E7F0EC; --sheet:#F4FAF7; --ink:#23332C; --ink-soft:#5F7068;
+  --ai:#1F6F5C; --ai-weak:#DCEFE8; --shu:#B5402B; --line:#D2E2DA;
+}
+body[data-theme="night"]{
+  --paper:#0E1726; --sheet:#16223A; --ink:#DCE6F5; --ink-soft:#8896AE;
+  --ai:#7FA8E0; --ai-weak:#1E2C46; --shu:#E08B76; --line:#27344F;
+}
 body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
 #app{max-width:680px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
 
 /* ---- 秘モード：入力欄を■で隠す ---- */
+body.secret .ed-rich,
 body.secret .ed-body,
 body.secret .ed-title,
 body.secret textarea,
@@ -140,6 +159,35 @@ input:focus,textarea:focus{outline:2px solid var(--ai);outline-offset:-1px}
   border:none;background:none;width:100%;min-height:60vh;padding:12px 2px;resize:none;
 }
 .ed-body:focus{outline:none}
+/* リッチ本文：contenteditable */
+.ed-rich{
+  font-family:var(--serif);font-size:16px;line-height:2.0;letter-spacing:.02em;
+  width:100%;min-height:60vh;padding:12px 2px;outline:none;white-space:pre-wrap;
+  word-break:break-word;-webkit-user-modify:read-write;
+}
+.ed-rich:empty:before{content:attr(data-ph);color:var(--ink-soft)}
+.ed-rich u{text-decoration-thickness:1px;text-underline-offset:3px}
+.ed-rich s{text-decoration-line:line-through}
+/* 傍点：圏点（縦横どちらでも文字の脇に点） */
+.ed-rich em.bouten, .tate-body em.bouten{
+  font-style:normal;
+  -webkit-text-emphasis:filled dot; text-emphasis:filled dot;
+  -webkit-text-emphasis-position:over right; text-emphasis-position:over right;
+}
+/* 装飾ツールバー */
+.ed-tools{
+  position:sticky;top:calc(env(safe-area-inset-top) + 56px);z-index:8;
+  display:none;gap:6px;background:var(--paper);padding:8px 0 6px;
+  border-bottom:1px solid var(--line);flex-wrap:wrap;
+}
+.ed-tools.show{display:flex}
+.iconbtn.toolon{background:var(--ai);border-color:var(--ai);color:#fff}
+.ed-tools button{
+  border:1px solid var(--line);background:var(--sheet);color:var(--ink);
+  border-radius:7px;padding:6px 12px;font-size:14px;font-family:var(--serif);cursor:pointer;
+}
+.ed-tools button:active{background:var(--ai-weak)}
+.ed-tools .lbl{font-size:11px;color:var(--ink-soft);align-self:center;margin-right:2px}
 .counter{
   position:sticky;bottom:0;background:var(--paper);
   border-top:1px solid var(--line);padding:8px 2px calc(env(safe-area-inset-bottom) + 8px);
@@ -169,6 +217,14 @@ input:focus,textarea:focus{outline:2px solid var(--ai);outline-offset:-1px}
   max-height:88vh;overflow-y:auto;
 }
 .modal h2{font-family:var(--serif);font-size:16px;margin-bottom:14px}
+.dlg-bg{position:fixed;inset:0;background:rgba(43,42,40,.45);z-index:60;
+  display:flex;align-items:center;justify-content:center;padding:24px}
+.dlg{background:var(--sheet);border:1px solid var(--line);border-radius:14px;
+  width:100%;max-width:340px;padding:20px 18px 16px;box-shadow:0 8px 30px rgba(43,42,40,.25)}
+.dlg p{font-size:14px;line-height:1.7;white-space:pre-wrap;margin-bottom:16px}
+.dlg input{width:100%;margin-bottom:16px}
+.dlg .btns{display:flex;gap:8px}
+.dlg .btns .iconbtn{flex:1;padding:11px;text-align:center}
 .modal .row{display:flex;gap:8px;margin-top:14px}
 .modal .row .iconbtn{flex:1;padding:11px;text-align:center}
 .modal .bigimg{width:100%;max-height:52vh;object-fit:contain;border-radius:8px;
@@ -217,6 +273,7 @@ input:focus,textarea:focus{outline:2px solid var(--ai);outline-offset:-1px}
 <div id="app"></div>
 <input type="file" id="importFile" accept=".json,application/json" style="display:none">
 <input type="file" id="imgFile" accept="image/*" style="display:none">
+<input type="file" id="txtFile" accept=".txt,text/plain" style="display:none">
 
 <script>
 "use strict";
@@ -310,7 +367,7 @@ function saveLS(){
   try{ localStorage.setItem(LS_KEY, JSON.stringify(data)); markSaved(); }
   catch(e){
     if(e && (e.name==="QuotaExceededError" || e.code===22)){
-      alert("端末の保存容量がいっぱいです。画像を減らすか、JSONで控えを取ってから整理してください。");
+      uiAlert("端末の保存容量がいっぱいです。画像を減らすか、JSONで控えを取ってから整理してください。");
       markSaved("※容量超過：保存できていません");
     } else markSaved("※この環境では端末保存不可（書き出し推奨）");
   }
@@ -365,6 +422,7 @@ async function init(){
   }
   if(!useIDB) data = loadLS();
   applySecret();
+applyTheme();
   render();
 }
 
@@ -372,6 +430,51 @@ async function init(){
 let secret = false;
 try{ secret = localStorage.getItem(SECRET_KEY)==="1"; }catch(e){}
 function applySecret(){ document.body.classList.toggle("secret", secret); }
+
+/* ===== テーマ（背景色） ===== */
+const THEME_KEY = "monokakicho_theme";
+const THEMES = [
+  {id:"light", name:"生成り（標準）"},
+  {id:"dark",  name:"黒（ダーク）"},
+  {id:"night", name:"紺（ナイト）"},
+  {id:"sepia", name:"セピア"},
+  {id:"mint",  name:"若葉"},
+];
+let tools = false;  // 装飾ツールバーの表示状態
+try{ tools = localStorage.getItem("monokakicho_tools")==="1"; }catch(e){}
+function toggleTools(){
+  tools = !tools;
+  try{ localStorage.setItem("monokakicho_tools", tools?"1":"0"); }catch(e){}
+  const t = document.getElementById("edTools");
+  const b = document.getElementById("toolBtn");
+  if(t) t.classList.toggle("show", tools);
+  if(b) b.classList.toggle("toolon", tools);
+}
+let theme = "light";
+try{ theme = localStorage.getItem(THEME_KEY) || "light"; }catch(e){}
+function applyTheme(){
+  if(theme==="light") document.body.removeAttribute("data-theme");
+  else document.body.setAttribute("data-theme", theme);
+  const meta = document.querySelector('meta[name=theme-color]');
+  if(meta){
+    const bg = getComputedStyle(document.body).getPropertyValue('--paper').trim();
+    if(bg) meta.setAttribute('content', bg);
+  }
+}
+function setTheme(id){
+  theme = id;
+  try{ localStorage.setItem(THEME_KEY, id); }catch(e){}
+  applyTheme(); closeModal(); render();
+}
+function openThemeMenu(){
+  openModal(`
+    <h2>背景の色を選ぶ</h2>
+    ${THEMES.map(t=>`<button class="menu-item" onclick="setTheme('${t.id}')">
+      ${t.name}${theme===t.id?'　✓':''}</button>`).join("")}
+    <div class="note">黒・紺の暗い背景では、文字や見出しが自動で明るい色に切り替わって読みやすうなります。</div>
+    <div class="row"><button class="iconbtn" onclick="closeModal()">閉じる</button></div>
+  `);
+}
 function toggleSecret(){
   secret = !secret;
   try{ localStorage.setItem(SECRET_KEY, secret ? "1" : "0"); }catch(e){}
@@ -391,9 +494,22 @@ function secretBtn(){
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 const esc = s => (s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmtDate = ts => { const d = new Date(ts); return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`; };
-function countChars(s){ return (s||"").replace(/\s/g,"").length; }
+function htmlToPlain(html){
+  if(html==null) return "";
+  // <br>と</div>/<p>を改行に、その他タグを除去、実体参照を戻す
+  let t = String(html)
+    .replace(/<div><br\s*\/?><\/div>/gi,"\n")
+    .replace(/<br\s*\/?>/gi,"\n")
+    .replace(/<\/(div|p)>/gi,"\n")
+    .replace(/<[^>]+>/g,"");
+  const ta = document.createElement("textarea"); ta.innerHTML = t;
+  return ta.value;
+}
+function isHtmlBody(s){ return /<(br|div|p|u|s|em|span)[ >]/i.test(s||""); }
+function bodyPlain(body){ return isHtmlBody(body) ? htmlToPlain(body) : (body||""); }
+function countChars(s){ return bodyPlain(s).replace(/\s/g,"").length; }
 function genkou(s){
-  const n = (s||"").replace(/\s/g,"").length;
+  const n = bodyPlain(s).replace(/\s/g,"").length;
   return { mai: Math.floor(n/400), ji: n%400, n };
 }
 function fmtBytes(b){
@@ -447,7 +563,7 @@ $("#imgFile").addEventListener("change", function(){
       const cb = imgCallback; imgCallback = null;
       cb(dataUrl);
     };
-    img.onerror = () => alert("画像を読み込めませんでした。");
+    img.onerror = () => uiAlert("画像を読み込めませんでした。");
     img.src = r.result;
   };
   r.readAsDataURL(f);
@@ -474,6 +590,7 @@ function renderHome(){
   app.innerHTML = `
     <div class="hdr">
       <h1>物書き帖</h1>
+      <button class="iconbtn" onclick="openThemeMenu()" title="背景色">色</button>
       ${secretBtn()}
       <button class="iconbtn" onclick="openBackupMenu()">控え</button>
     </div>
@@ -487,8 +604,8 @@ function renderHome(){
     <button class="fab home" onclick="newWork()">＋</button>
   `;
 }
-function newWork(){
-  const title = prompt("作品のタイトルは？");
+async function newWork(){
+  const title = await uiPrompt("作品のタイトルは？");
   if(title===null) return;
   const w = { id:uid(), title:title.trim()||"無題の作品",
     createdAt:Date.now(), updatedAt:Date.now(),
@@ -540,7 +657,7 @@ function tabWrite(w){
     return `<div class="card" onclick="go({screen:'editor',itemId:'${c.id}'})">
       <div class="t"><span class="badge">${i+1}</span>${mask(c.title, 14) || "無題"}</div>
       <div class="m">${g.n.toLocaleString()}字（${g.mai}枚と${g.ji}字） ・ ${fmtDate(c.updatedAt)}</div>
-      <div class="preview">${mask((c.body||"").slice(0,80), 40)}</div>
+      <div class="preview">${mask(bodyPlain(c.body).slice(0,80), 40)}</div>
     </div>`;
   }).join("");
 }
@@ -666,8 +783,8 @@ function saveCard(){
   else w[key].push({id:uid(), title, body});
   w.updatedAt = Date.now(); persistWork(w); closeModal(); render();
 }
-function deleteCard(){
-  if(!confirm("ほんまに削除してよろしおすか？")) return;
+async function deleteCard(){
+  if(!await uiConfirm("ほんまに削除してよろしおすか？","削除する")) return;
   const w = getWork(); const {key,id} = editing;
   w[key] = w[key].filter(x=>x.id!==id);
   w.updatedAt = Date.now(); persistWork(w); closeModal(); render();
@@ -733,12 +850,21 @@ function renderEditor(){
       <button class="iconbtn" onclick="go({screen:'work'})">‹ 戻る</button>
       <h1 class="sub">${mask(w.title, 10)}</h1>
       ${secretBtn()}
+      <button class="iconbtn ${tools?'toolon':''}" id="toolBtn" onclick="toggleTools()">装飾</button>
       <button class="iconbtn" onclick="openTate()">縦書き</button>
       <button class="iconbtn danger" onclick="deleteChapter()">削除</button>
     </div>
     <div class="main editor-main">
       <input class="ed-title" id="ed_title" value="${esc(c.title)}" placeholder="話のタイトル">
-      <textarea class="ed-body" id="ed_body" placeholder="ここに本文を書いとくれやす。">${esc(c.body)}</textarea>
+      <div class="ed-tools ${tools?'show':''}" id="edTools">
+        <span class="lbl">選んで↓</span>
+        <button onmousedown="event.preventDefault()" onclick="fmt('underline')" title="下線"><u>下線</u></button>
+        <button onmousedown="event.preventDefault()" onclick="fmt('strike')" title="取り消し線"><s>取消</s></button>
+        <button onmousedown="event.preventDefault()" onclick="fmt('bouten')" title="傍点">傍点</button>
+        <button onmousedown="event.preventDefault()" onclick="fmt('clear')" title="装飾を消す">解除</button>
+      </div>
+      <div class="ed-rich" id="ed_body" contenteditable="true"
+           data-ph="ここに本文を書いとくれやす。"></div>
       <div class="counter">
         <span class="maisu" id="ed_count"></span>
         <span class="savemark" id="savemark"></span>
@@ -746,8 +872,10 @@ function renderEditor(){
     </div>
   `;
   const tEl = $("#ed_title"), bEl = $("#ed_body");
+  // 初期表示：既存のプレーン本文ならHTMLに変換、リッチ本文ならそのまま
+  bEl.innerHTML = isHtmlBody(c.body) ? c.body : plainToHtml(c.body||"");
   const update = ()=>{
-    c.title = tEl.value; c.body = bEl.value;
+    c.title = tEl.value; c.body = bEl.innerHTML;
     c.updatedAt = Date.now(); w.updatedAt = Date.now();
     updateCount(c.body); queueSave();
   };
@@ -755,12 +883,61 @@ function renderEditor(){
   bEl.addEventListener("input", update);
   updateCount(c.body);
 }
+function plainToHtml(t){
+  return esc(t).replace(/\n/g,"<br>");
+}
+/* 選択範囲に装飾を適用 */
+function fmt(kind){
+  const ed = $("#ed_body"); if(!ed) return;
+  ed.focus();
+  if(kind==="underline"){ document.execCommand("underline"); }
+  else if(kind==="strike"){ document.execCommand("strikeThrough"); }
+  else if(kind==="bouten"){ toggleBouten(); }
+  else if(kind==="clear"){
+    document.execCommand("removeFormat");
+    // 傍点も外す
+    unwrapBouten();
+  }
+  // 反映を保存
+  const ev = new Event("input"); ed.dispatchEvent(ev);
+}
+function toggleBouten(){
+  const sel = window.getSelection();
+  if(!sel || sel.rangeCount===0 || sel.isCollapsed) return;
+  const range = sel.getRangeAt(0);
+  // すでに傍点内なら外す、そうでなければ包む
+  let node = sel.anchorNode;
+  let inside = null;
+  while(node && node!==$("#ed_body")){
+    if(node.nodeType===1 && node.classList && node.classList.contains("bouten")){ inside=node; break; }
+    node = node.parentNode;
+  }
+  if(inside){
+    const parent = inside.parentNode;
+    while(inside.firstChild) parent.insertBefore(inside.firstChild, inside);
+    parent.removeChild(inside);
+    return;
+  }
+  const em = document.createElement("em");
+  em.className = "bouten";
+  try{ em.appendChild(range.extractContents()); range.insertNode(em); }
+  catch(e){}
+  sel.removeAllRanges();
+}
+function unwrapBouten(){
+  const ed = $("#ed_body"); if(!ed) return;
+  ed.querySelectorAll("em.bouten").forEach(em=>{
+    const p = em.parentNode;
+    while(em.firstChild) p.insertBefore(em.firstChild, em);
+    p.removeChild(em);
+  });
+}
 function updateCount(body){
   const g = genkou(body);
   $("#ed_count").innerHTML = `${g.n.toLocaleString()}字　原稿用紙 <b>${g.mai}</b>枚と<b>${g.ji}</b>字`;
 }
-function deleteChapter(){
-  if(!confirm("この話をほんまに削除してよろしおすか？")) return;
+async function deleteChapter(){
+  if(!await uiConfirm("この話をほんまに削除してよろしおすか？","削除する")) return;
   const w = getWork();
   w.chapters = w.chapters.filter(x=>x.id!==view.itemId);
   w.updatedAt = Date.now(); persistWork(w);
@@ -768,7 +945,15 @@ function deleteChapter(){
 }
 function openTate(){
   const w = getWork(); const c = w.chapters.find(x=>x.id===view.itemId);
-  const body = secret ? (c.body||"").replace(/[^\n]/g,"■") : (c.body||"");
+  const rich = isHtmlBody(c.body) ? c.body : plainToHtml(c.body||"");
+  let bodyHtml;
+  if(secret){
+    // 装飾は保ったまま文字だけ■に（タグの外側の文字を置換）
+    bodyHtml = rich.replace(/>([^<]+)</g, (m,txt)=>">"+txt.replace(/[^\s]/g,"■")+"<")
+                   .replace(/^([^<]+)/, (m,txt)=>txt.replace(/[^\s]/g,"■"));
+  } else {
+    bodyHtml = rich;
+  }
   const div = document.createElement("div");
   div.className = "tate-wrap"; div.id = "tate";
   div.innerHTML = `
@@ -776,7 +961,7 @@ function openTate(){
       <span class="t">${mask(c.title, 12) || "無題"}</span>
       <button class="iconbtn" onclick="document.getElementById('tate').remove()">閉じる</button>
     </div>
-    <div class="tate-body">${esc(body)||"（本文がおへん）"}</div>
+    <div class="tate-body">${bodyHtml||"（本文がおへん）"}</div>
   `;
   document.body.appendChild(div);
 }
@@ -788,25 +973,27 @@ function openWorkMenu(){
     <button class="menu-item" onclick="renameWork()">タイトルを変更</button>
     <button class="menu-item" onclick="exportTxt()">本文をTXTで書き出す（全話）</button>
     <button class="menu-item" onclick="openExportPicker()">話数を選んでTXT書き出し</button>
+    <button class="menu-item" onclick="document.getElementById('txtFile').click()">TXTを読み込んで一話に追加</button>
+    <button class="menu-item" onclick="openThemeMenu()">背景の色を変える</button>
     <button class="menu-item danger" onclick="deleteWork()">この作品を削除</button>
     <div class="row"><button class="iconbtn" onclick="closeModal()">閉じる</button></div>
   `);
 }
-function renameWork(){
+async function renameWork(){
   const w = getWork();
-  const t = prompt("新しいタイトルは？", w.title);
+  const t = await uiPrompt("新しいタイトルは？", w.title);
   if(t===null) return;
   w.title = t.trim()||w.title; w.updatedAt = Date.now();
   persistWork(w); closeModal(); render();
 }
-function deleteWork(){
+async function deleteWork(){
   const w = getWork();
-  if(!confirm(`「${w.title}」を本文ごとすべて削除します。ほんまによろしおすか？`)) return;
+  if(!await uiConfirm(`「${w.title}」を本文ごとすべて削除します。ほんまによろしおすか？`,"削除する")) return;
   data.works = data.works.filter(x=>x.id!==w.id);
   removeWorkRecord(w.id); closeModal(); go({screen:"home"});
 }
 function buildTxt(w, chapters){
-  return `${w.title}\n\n` + chapters.map(c=>`【${c.title}】\n\n${c.body}`).join("\n\n\n");
+  return `${w.title}\n\n` + chapters.map(c=>`【${c.title}】\n\n${bodyPlain(c.body)}`).join("\n\n\n");
 }
 function exportTxt(){
   const w = getWork();
@@ -816,7 +1003,7 @@ function exportTxt(){
 /* ---- 話数を選んで書き出し ---- */
 function openExportPicker(){
   const w = getWork();
-  if(!w.chapters.length){ alert("書き出せる話がおへん。"); return; }
+  if(!w.chapters.length){ uiAlert("書き出せる話がおへん。"); return; }
   const rows = w.chapters.map((c,i)=>`
     <label class="picker-row">
       <input type="checkbox" class="exp-chk" value="${c.id}" checked>
@@ -844,7 +1031,7 @@ function doExportSelected(){
   const w = getWork();
   const ids = Array.from(document.querySelectorAll(".exp-chk"))
     .filter(c=>c.checked).map(c=>c.value);
-  if(!ids.length){ alert("一話も選ばれてしまへん。"); return; }
+  if(!ids.length){ uiAlert("一話も選ばれてしまへん。"); return; }
   const chapters = w.chapters.filter(c=>ids.includes(c.id));
   // ファイル名：1話だけならその話名、複数なら作品名＋話数
   let name;
@@ -890,17 +1077,41 @@ function exportJson(){
 $("#importFile").addEventListener("change", function(){
   const f = this.files[0]; if(!f) return;
   const r = new FileReader();
-  r.onload = () => {
+  const self = this;
+  r.onload = async () => {
     try{
       const d = migrate(JSON.parse(r.result));
       if(!d || !Array.isArray(d.works)) throw new Error("形式が違います");
-      if(!confirm(`読み込むと今のデータは置き換わります（作品${d.works.length}件）。よろしおすか？`)) return;
+      if(!await uiConfirm(`読み込むと今のデータは置き換わります（作品${d.works.length}件）。よろしおすか？`,"読み込む")){ self.value=""; return; }
       data = d;
-      persistAll().then(()=>{ closeModal(); go({screen:"home"}); alert("読み込みました。"); });
-    }catch(e){ alert("読み込めませんでした：JSONの形式をご確認ください。"); }
-    this.value = "";
+      await persistAll(); closeModal(); go({screen:"home"}); uiAlert("読み込みました。");
+    }catch(e){ uiAlert("読み込めませんでした：JSONの形式をご確認ください。"); }
+    self.value = "";
   };
   r.readAsText(f);
+});
+/* ---- TXT取り込み：1ファイル＝1話として追加 ---- */
+$("#txtFile").addEventListener("change", function(){
+  const f = this.files[0]; const self = this;
+  if(!f){ return; }
+  const w = getWork(); if(!w){ self.value=""; return; }
+  const r = new FileReader();
+  r.onload = async () => {
+    let text = String(r.result||"");
+    // 先頭BOMを除去
+    text = text.replace(/^\uFEFF/, "");
+    // ファイル名（拡張子抜き）を話タイトルの既定に
+    const base = f.name.replace(/\.[^.]+$/, "");
+    const title = (await uiPrompt("この話のタイトルは？", base)) ;
+    if(title===null){ self.value=""; return; }
+    const c = { id:uid(), title:title.trim()||base||`第${w.chapters.length+1}話`,
+      body: plainToHtml(text), updatedAt:Date.now() };
+    w.chapters.push(c); w.updatedAt = Date.now();
+    persistWork(w); self.value="";
+    go({screen:"editor", itemId:c.id});
+  };
+  r.onerror = () => { uiAlert("ファイルを読み込めませんでした。"); self.value=""; };
+  r.readAsText(f, "UTF-8");
 });
 function download(name, content, type){
   // TXTはWindowsのメモ帳でも化けへんよう、頭にBOMを付ける
@@ -924,6 +1135,51 @@ function openModal(html){
   document.body.appendChild(bg);
 }
 function closeModal(){ const m = $("#modalbg"); if(m) m.remove(); }
+
+/* ---- 自前ダイアログ（PWAでconfirm/alert/promptが効かへん対策） ---- */
+function uiAlert(msg){
+  return new Promise(resolve=>{
+    const bg = document.createElement("div");
+    bg.className = "dlg-bg";
+    bg.innerHTML = `<div class="dlg"><p>${esc(msg)}</p>
+      <div class="btns"><button class="iconbtn primary" id="dlgOk">わかった</button></div></div>`;
+    document.body.appendChild(bg);
+    bg.querySelector("#dlgOk").onclick = ()=>{ bg.remove(); resolve(); };
+  });
+}
+function uiConfirm(msg, okLabel){
+  return new Promise(resolve=>{
+    const bg = document.createElement("div");
+    bg.className = "dlg-bg";
+    bg.innerHTML = `<div class="dlg"><p>${esc(msg)}</p>
+      <div class="btns">
+        <button class="iconbtn" id="dlgNo">やめとく</button>
+        <button class="iconbtn danger" id="dlgYes">${esc(okLabel||"はい")}</button>
+      </div></div>`;
+    document.body.appendChild(bg);
+    bg.querySelector("#dlgNo").onclick = ()=>{ bg.remove(); resolve(false); };
+    bg.querySelector("#dlgYes").onclick = ()=>{ bg.remove(); resolve(true); };
+  });
+}
+function uiPrompt(msg, def){
+  return new Promise(resolve=>{
+    const bg = document.createElement("div");
+    bg.className = "dlg-bg";
+    bg.innerHTML = `<div class="dlg"><p>${esc(msg)}</p>
+      <input type="text" id="dlgInput" value="${esc(def||"")}">
+      <div class="btns">
+        <button class="iconbtn" id="dlgNo">やめとく</button>
+        <button class="iconbtn primary" id="dlgYes">決定</button>
+      </div></div>`;
+    document.body.appendChild(bg);
+    const inp = bg.querySelector("#dlgInput");
+    inp.focus(); inp.select();
+    const ok = ()=>{ const v = inp.value; bg.remove(); resolve(v); };
+    bg.querySelector("#dlgYes").onclick = ok;
+    bg.querySelector("#dlgNo").onclick = ()=>{ bg.remove(); resolve(null); };
+    inp.addEventListener("keydown", e=>{ if(e.key==="Enter") ok(); });
+  });
+}
 
 
 /* ---- PWA：オフライン用サービスワーカー登録（https時のみ） ---- */
