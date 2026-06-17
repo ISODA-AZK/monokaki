@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>物書き帖</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#F7F4ED">
@@ -177,18 +177,19 @@ input:focus,textarea:focus{outline:2px solid var(--ai);outline-offset:-1px}
 }
 /* 装飾ツールバー */
 .ed-tools{
-  position:fixed;left:0;right:0;bottom:0;z-index:30;
+  position:fixed;left:0;right:0;z-index:45;
+  bottom:var(--kb,0px);            /* キーボードの高さぶん持ち上げる */
   max-width:680px;margin:0 auto;
   display:none;gap:8px;background:var(--sheet);
-  padding:10px 12px calc(env(safe-area-inset-bottom) + 10px);
+  padding:9px 12px calc(env(safe-area-inset-bottom) + 9px);
   border-top:1px solid var(--line);
-  box-shadow:0 -3px 12px rgba(43,42,40,.12);
+  box-shadow:0 -3px 12px rgba(43,42,40,.15);
   justify-content:space-around;
 }
+body.kbopen .ed-tools{ padding-bottom:9px; }  /* キーボード上にある時は下余白不要 */
 .ed-tools.show{display:flex}
-.ed-tools button{flex:1;max-width:88px}
+.ed-tools button{flex:1;max-width:90px;padding:9px 6px}
 .iconbtn.toolon{background:var(--ai);border-color:var(--ai);color:#fff}
-/* ツールバーを開いてる間は本文下に余白を足して隠れんようにする */
 body.toolsopen .main.editor-main{padding-bottom:calc(env(safe-area-inset-bottom) + 78px)}
 .ed-tools button{
   border:1px solid var(--line);background:var(--sheet);color:var(--ink);
@@ -431,6 +432,7 @@ async function init(){
   if(!useIDB) data = loadLS();
   applySecret();
 applyTheme();
+trackKeyboard();
   render();
 }
 
@@ -450,6 +452,20 @@ const THEMES = [
 ];
 let tools = false;  // 装飾ツールバーの表示状態
 try{ tools = localStorage.getItem("monokakicho_tools")==="1"; }catch(e){}
+/* キーボードの高さを測って装飾バーをその真上に貼り付ける */
+function trackKeyboard(){
+  const vv = window.visualViewport;
+  if(!vv) return;
+  const apply = ()=>{
+    // レイアウト高さ − 表示領域高さ − スクロール量 ＝ キーボードが覆ってる高さ
+    const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    document.documentElement.style.setProperty("--kb", kb + "px");
+    document.body.classList.toggle("kbopen", kb > 80);
+  };
+  vv.addEventListener("resize", apply);
+  vv.addEventListener("scroll", apply);
+  apply();
+}
 function toggleTools(){
   tools = !tools;
   try{ localStorage.setItem("monokakicho_tools", tools?"1":"0"); }catch(e){}
