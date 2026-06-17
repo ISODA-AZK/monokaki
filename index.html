@@ -166,6 +166,7 @@ input:focus,textarea:focus{outline:2px solid var(--ai);outline-offset:-1px}
   word-break:break-word;-webkit-user-modify:read-write;
 }
 .ed-rich:empty:before{content:attr(data-ph);color:var(--ink-soft)}
+.ed-rich b, .ed-rich strong{font-weight:700}
 .ed-rich u{text-decoration-thickness:1px;text-underline-offset:3px}
 .ed-rich s{text-decoration-line:line-through}
 /* 傍点：圏点（縦横どちらでも文字の脇に点） */
@@ -176,12 +177,19 @@ input:focus,textarea:focus{outline:2px solid var(--ai);outline-offset:-1px}
 }
 /* 装飾ツールバー */
 .ed-tools{
-  position:sticky;top:calc(env(safe-area-inset-top) + 56px);z-index:8;
-  display:none;gap:6px;background:var(--paper);padding:8px 0 6px;
-  border-bottom:1px solid var(--line);flex-wrap:wrap;
+  position:fixed;left:0;right:0;bottom:0;z-index:30;
+  max-width:680px;margin:0 auto;
+  display:none;gap:8px;background:var(--sheet);
+  padding:10px 12px calc(env(safe-area-inset-bottom) + 10px);
+  border-top:1px solid var(--line);
+  box-shadow:0 -3px 12px rgba(43,42,40,.12);
+  justify-content:space-around;
 }
 .ed-tools.show{display:flex}
+.ed-tools button{flex:1;max-width:88px}
 .iconbtn.toolon{background:var(--ai);border-color:var(--ai);color:#fff}
+/* ツールバーを開いてる間は本文下に余白を足して隠れんようにする */
+body.toolsopen .main.editor-main{padding-bottom:calc(env(safe-area-inset-bottom) + 78px)}
 .ed-tools button{
   border:1px solid var(--line);background:var(--sheet);color:var(--ink);
   border-radius:7px;padding:6px 12px;font-size:14px;font-family:var(--serif);cursor:pointer;
@@ -449,6 +457,7 @@ function toggleTools(){
   const b = document.getElementById("toolBtn");
   if(t) t.classList.toggle("show", tools);
   if(b) b.classList.toggle("toolon", tools);
+  document.body.classList.toggle("toolsopen", tools);
 }
 let theme = "light";
 try{ theme = localStorage.getItem(THEME_KEY) || "light"; }catch(e){}
@@ -505,7 +514,7 @@ function htmlToPlain(html){
   const ta = document.createElement("textarea"); ta.innerHTML = t;
   return ta.value;
 }
-function isHtmlBody(s){ return /<(br|div|p|u|s|em|span)[ >]/i.test(s||""); }
+function isHtmlBody(s){ return /<(br|div|p|u|s|b|i|em|strong|span|font)[ >\/]/i.test(s||""); }
 function bodyPlain(body){ return isHtmlBody(body) ? htmlToPlain(body) : (body||""); }
 function countChars(s){ return bodyPlain(s).replace(/\s/g,"").length; }
 function genkou(s){
@@ -572,6 +581,7 @@ $("#imgFile").addEventListener("change", function(){
 /* ============ 描画 ============ */
 const app = $("#app");
 function render(){
+  if(view.screen!=="editor") document.body.classList.remove("toolsopen");
   if(view.screen==="home") renderHome();
   else if(view.screen==="work") renderWork();
   else if(view.screen==="editor") renderEditor();
@@ -857,11 +867,11 @@ function renderEditor(){
     <div class="main editor-main">
       <input class="ed-title" id="ed_title" value="${esc(c.title)}" placeholder="話のタイトル">
       <div class="ed-tools ${tools?'show':''}" id="edTools">
-        <span class="lbl">選んで↓</span>
-        <button onmousedown="event.preventDefault()" onclick="fmt('underline')" title="下線"><u>下線</u></button>
-        <button onmousedown="event.preventDefault()" onclick="fmt('strike')" title="取り消し線"><s>取消</s></button>
-        <button onmousedown="event.preventDefault()" onclick="fmt('bouten')" title="傍点">傍点</button>
-        <button onmousedown="event.preventDefault()" onclick="fmt('clear')" title="装飾を消す">解除</button>
+        <button ontouchstart="fmtTouch(event,'bold')" onmousedown="event.preventDefault()" onclick="fmt('bold')" title="太字"><b>太字</b></button>
+        <button ontouchstart="fmtTouch(event,'underline')" onmousedown="event.preventDefault()" onclick="fmt('underline')" title="下線"><u>下線</u></button>
+        <button ontouchstart="fmtTouch(event,'strike')" onmousedown="event.preventDefault()" onclick="fmt('strike')" title="取り消し線"><s>取消</s></button>
+        <button ontouchstart="fmtTouch(event,'bouten')" onmousedown="event.preventDefault()" onclick="fmt('bouten')" title="傍点">傍点</button>
+        <button ontouchstart="fmtTouch(event,'clear')" onmousedown="event.preventDefault()" onclick="fmt('clear')" title="装飾を消す">解除</button>
       </div>
       <div class="ed-rich" id="ed_body" contenteditable="true"
            data-ph="ここに本文を書いとくれやす。"></div>
@@ -882,6 +892,7 @@ function renderEditor(){
   tEl.addEventListener("input", update);
   bEl.addEventListener("input", update);
   updateCount(c.body);
+  document.body.classList.toggle("toolsopen", tools);
 }
 function plainToHtml(t){
   return esc(t).replace(/\n/g,"<br>");
@@ -889,17 +900,20 @@ function plainToHtml(t){
 /* 選択範囲に装飾を適用 */
 function fmt(kind){
   const ed = $("#ed_body"); if(!ed) return;
-  ed.focus();
-  if(kind==="underline"){ document.execCommand("underline"); }
+  if(kind==="bold"){ document.execCommand("bold"); }
+  else if(kind==="underline"){ document.execCommand("underline"); }
   else if(kind==="strike"){ document.execCommand("strikeThrough"); }
   else if(kind==="bouten"){ toggleBouten(); }
   else if(kind==="clear"){
     document.execCommand("removeFormat");
-    // 傍点も外す
     unwrapBouten();
   }
-  // 反映を保存
   const ev = new Event("input"); ed.dispatchEvent(ev);
+}
+/* スマホ：選択メニューが選択を奪う前に、タッチ開始で即装飾を当てる */
+function fmtTouch(e, kind){
+  e.preventDefault();   // 選択解除・メニュー再表示を防ぐ
+  fmt(kind);
 }
 function toggleBouten(){
   const sel = window.getSelection();
@@ -923,6 +937,23 @@ function toggleBouten(){
   try{ em.appendChild(range.extractContents()); range.insertNode(em); }
   catch(e){}
   sel.removeAllRanges();
+}
+function maskHtmlText(html){
+  let out = "", i = 0;
+  while(i < html.length){
+    if(html[i] === "<"){
+      const end = html.indexOf(">", i);
+      if(end === -1){ out += html.slice(i); break; }
+      out += html.slice(i, end+1);
+      i = end + 1;
+    } else {
+      const next = html.indexOf("<", i);
+      const seg = (next===-1) ? html.slice(i) : html.slice(i, next);
+      out += seg.replace(/[^\s]/g, "■");
+      i = (next===-1) ? html.length : next;
+    }
+  }
+  return out;
 }
 function unwrapBouten(){
   const ed = $("#ed_body"); if(!ed) return;
@@ -948,9 +979,7 @@ function openTate(){
   const rich = isHtmlBody(c.body) ? c.body : plainToHtml(c.body||"");
   let bodyHtml;
   if(secret){
-    // 装飾は保ったまま文字だけ■に（タグの外側の文字を置換）
-    bodyHtml = rich.replace(/>([^<]+)</g, (m,txt)=>">"+txt.replace(/[^\s]/g,"■")+"<")
-                   .replace(/^([^<]+)/, (m,txt)=>txt.replace(/[^\s]/g,"■"));
+    bodyHtml = maskHtmlText(rich);   // 装飾は残し、文字だけ■に
   } else {
     bodyHtml = rich;
   }
